@@ -34,58 +34,94 @@
 
     </div>
 
-    <script>
-        const form = document.getElementById('uploadForm');
-        const loading = document.getElementById('loading');
-        const resultDiv = document.getElementById('result');
-        const videoContainer = document.getElementById('videoContainer');
-        const videoPreview = document.getElementById('videoPreview');
+            <script>
+                const form = document.getElementById('uploadForm');
+                const loading = document.getElementById('loading');
+                const resultDiv = document.getElementById('result');
+                const videoContainer = document.getElementById('videoContainer');
+                const videoPreview = document.getElementById('videoPreview');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById('video');
-            if (!fileInput.files.length) return;
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const fileInput = document.getElementById('video');
+                    if (!fileInput.files.length) return;
 
-            // Show video preview
-            const file = fileInput.files[0];
-            videoPreview.src = URL.createObjectURL(file);
-            videoContainer.classList.remove('hidden');
+                    // Show video preview
+                    const file = fileInput.files[0];
+                    videoPreview.src = URL.createObjectURL(file);
+                    videoContainer.classList.remove('hidden');
 
-            loading.classList.remove('hidden');
-            resultDiv.classList.add('hidden');
-            resultDiv.innerHTML = '';
+                    loading.classList.remove('hidden');
+                    resultDiv.classList.add('hidden');
+                    resultDiv.innerHTML = '';
 
-            const formData = new FormData();
-            formData.append('video', file);
+                    const formData = new FormData();
+                    formData.append('video', file);
 
-            try {
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    body: formData
+                    try {
+                        const response = await fetch('/analyze', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await response.json();
+
+                        if (data.error) {
+                            resultDiv.innerHTML = `<pre class="text-red-500">${data.error}</pre>`;
+                        } else {
+                            // Parse JSON safely with better error handling
+                            let jsonData;
+                            try {
+                                // Clean the response string to remove markdown code block markers
+                                const cleanedString = data.result.replace(/```json\s*|\s*```/g, '').trim();
+                                jsonData = JSON.parse(cleanedString);
+                            } catch (parseError) {
+                                console.error('JSON parsing error:', parseError);
+                                resultDiv.innerHTML = `<pre class="text-red-500">Error parsing JSON response: ${parseError.message}</pre>`;
+                                return;
+                            }
+
+                            // Display the JSON data in a more structured way
+                            resultDiv.innerHTML = `
+                                <h2 class="font-semibold mb-2">Analysis Result:</h2>
+                                
+                                <div class="mb-3">
+                                    <div class="font-medium text-gray-700">Classification:</div>
+                                    <div class="ml-2">${jsonData.classification || '-'}</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="font-medium text-gray-700">Severity:</div>
+                                    <div class="ml-2">${jsonData.severity || '-'}</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="font-medium text-gray-700">Confidence:</div>
+                                    <div class="ml-2">${jsonData.confidence ? (jsonData.confidence * 100).toFixed(2) + '%' : '-'}</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="font-medium text-gray-700">Explanation:</div>
+                                    <div class="ml-2 bg-gray-100 p-2 rounded whitespace-pre-wrap">${jsonData.explanation || '-'}</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="font-medium text-gray-700">Recommendations:</div>
+                                    <div class="ml-2 bg-gray-100 p-2 rounded whitespace-pre-wrap">${jsonData.recommendations || '-'}</div>
+                                </div>
+                                
+                                <details class="mt-4">
+                                    <summary class="cursor-pointer font-medium text-blue-600">Show Raw JSON</summary>
+                                    <pre class="mt-2 p-3 bg-gray-800 text-green-400 rounded text-sm overflow-auto">${JSON.stringify(jsonData, null, 2)}</pre>
+                                </details>
+                            `;
+                        }
+                    } catch (err) {
+                        resultDiv.innerHTML = `<pre class="text-red-500">Error: ${err.message || err}</pre>`;
+                    } finally {
+                        loading.classList.add('hidden');
+                        resultDiv.classList.remove('hidden');
+                    }
                 });
-                const data = await response.json();
-
-                if (data.error) {
-                    resultDiv.innerHTML = `<pre class="text-red-500">${data.error}</pre>`;
-                } else {
-                    // Parse JSON safely
-                    const cleanedString = data.result .replace(/```json\s*|\s*```/g, '');
-                    const jsonData = JSON.parse(cleanedString);
-
-                    resultDiv.innerHTML = `
-                        <h2 class="font-semibold mb-2">Analysis Result:</h2>
-                        <div class="mb-2"><strong>Hate Speech:</strong> ${jsonData.hatespeech|| '-'}</div>
-                        <div class="mb-2"><strong>Conclusion:</strong> <pre class="whitespace-pre-wrap bg-gray-100 p-2 rounded">${jsonData.conclusion || '-'}</pre></div>
-                    `;
-
-                }
-            } catch (err) {
-                resultDiv.innerHTML = `<pre class="text-red-500">Error: ${err}</pre>`;
-            } finally {
-                loading.classList.add('hidden');
-                resultDiv.classList.remove('hidden');
-            }
-        });
-    </script>
+            </script>
 </body>
 </html>
