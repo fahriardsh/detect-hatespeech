@@ -1,22 +1,30 @@
 from flask import Flask, request, jsonify, render_template
 import os
 import tempfile
-from google import generativeai as genai
+from google import genai
+from pydantic import BaseModel
 
 app = Flask(__name__)
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL_NAME = "gemini-2.0-flash"
+
+class StructuredOutputAnalyzed(BaseModel):
+    classification: str
+    severity: str
+    confidence: float
+    explanation: str
+    recommendations: str
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
 def upload_video_for_gemini(video_path):
-    video_file = genai.upload_file(video_path)
+    video_file = client.files.upload(file=video_path)
     while video_file.state.name == "PROCESSING":
         import time
         time.sleep(5)
-        video_file = genai.get_file(video_file.name)
+        video_file = client.files.get(name=video_file.name)
     if video_file.state.name == "FAILED":
         raise RuntimeError("Video upload failed")
     return video_file
@@ -67,13 +75,17 @@ def analyze_video():
                 "recommendations": "Actions like 'Flag for review', 'Report to authorities if threat imminent', or 'Remove content'."
             }
 
-            Use Bahasa Indonesia language.
+            Use Bahasa Indonesia language to generate your output.
             Do NOT add any extra text, labels, or sentences outside the JSON.  
         """
 
-        response = genai.GenerativeModel(MODEL_NAME).generate_content(
-            [video_file, prompt],
-            request_options={"timeout": 500}
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[video_file, prompt],
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": StructuredOutputAnalyzed,
+            },
         )
         print(response.text)
         return jsonify({"result": response.text})
