@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hate Speech Detector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-xl">
+        <h1 class="text-3xl font-bold mb-6 text-center">Hate Speech Detector</h1>
+
+        <!-- Upload Form -->
+        <form id="uploadForm" class="flex flex-col gap-4">
+            <input type="file" name="video" id="video" accept="video/*" required class="border p-2 rounded">
+            <button type="submit" class="bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Analyze</button>
+        </form>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="hidden mt-4 flex justify-center">
+            <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+        </div>
+
+        <!-- Result Card -->
+        <div id="result" class="mt-6 bg-gray-50 p-4 rounded hidden shadow-inner"></div>
+
+        <!-- Video Player -->
+        <div id="videoContainer" class="mt-6 hidden">
+            <h2 class="font-semibold mb-2">Video Preview:</h2>
+            <video id="videoPreview" controls class="w-full rounded shadow-md"></video>
+        </div>
+
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const loading = document.getElementById('loading');
+        const resultDiv = document.getElementById('result');
+        const videoContainer = document.getElementById('videoContainer');
+        const videoPreview = document.getElementById('videoPreview');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('video');
+            if (!fileInput.files.length) return;
+
+            // Show video preview
+            const file = fileInput.files[0];
+            videoPreview.src = URL.createObjectURL(file);
+            videoContainer.classList.remove('hidden');
+
+            loading.classList.remove('hidden');
+            resultDiv.classList.add('hidden');
+            resultDiv.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    resultDiv.innerHTML = `<pre class="text-red-500">${data.error}</pre>`;
+                } else {
+                    // Parse JSON safely
+                    const cleanedString = data.result .replace(/```json\s*|\s*```/g, '');
+                    const jsonData = JSON.parse(cleanedString);
+
+                    resultDiv.innerHTML = `
+                        <h2 class="font-semibold mb-2">Analysis Result:</h2>
+                        <div class="mb-2"><strong>Hate Speech:</strong> ${jsonData.hatespeech|| '-'}</div>
+                        <div class="mb-2"><strong>Conclusion:</strong> <pre class="whitespace-pre-wrap bg-gray-100 p-2 rounded">${jsonData.conclusion || '-'}</pre></div>
+                    `;
+
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<pre class="text-red-500">Error: ${err}</pre>`;
+            } finally {
+                loading.classList.add('hidden');
+                resultDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
